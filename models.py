@@ -25,13 +25,16 @@ class Contest(Base):
     description = db.Column(db.Text)
 
     def raffle(self):
-        names = self.names
-        winner_name = random.choice(names)
-        winner_name.winner = True
-        db.session.add(winner_name)
-        self.held_in = datetime.now()
-        db.session.add(self)
-        return winner_name
+        if not self.held_in:
+            names = self.names.filter_by(deleted=False).all()
+            winner_name = random.choice(names)
+            winner_name.winner = True
+            db.session.add(winner_name)
+            self.held_in = datetime.now()
+            db.session.add(self)
+            return winner_name
+        else:
+            return self.names.filter_by(deleted=False, winner=True).one()
 
     def __str__(self):
         return '%s - [%s]' % (self.name, self.key)
@@ -40,7 +43,7 @@ class Contest(Base):
 class Name(Base):
     winner = db.Column(db.Boolean, default=False, nullable=False, index=True)
     contest_id = db.Column(db.UUID, db.ForeignKey('contest.id'))
-    contest = db.relationship('Contest', backref='names', foreign_keys=[contest_id])
+    contest = db.relationship('Contest', backref=db.backref('names', lazy='dynamic'), foreign_keys=[contest_id])
 
     def __repr__(self):
         return '%s' % self.name
