@@ -1,8 +1,14 @@
-from flask import current_app as app
+from flask import current_app as app, request
 from models import Contest, Name
+from pprint import pprint
 from forms import ContestForm, NameForm
-from serializers import ContestSchema, NameSchema
-from app import db
+from serializers import ContestSchema, NameSchema, fetch_object
+from marshmallow import ValidationError
+from app import db, ma
+
+
+def merge_obj(obj, obj2):
+    pass
 
 
 @app.route('/contests', methods=['GET'])
@@ -31,31 +37,33 @@ def get_contests(pk=None):
 @app.route('/contests', methods=['POST'])
 @app.route('/contests/<uuid:pk>', methods=['PUT'])
 def add_or_update_contest(pk=None):
-    data = {'success': False, 'status': 500}
+
+    json_data = request.get_json()
+    if not json_data:
+        return dict(success=False, message='Request must be json encoded'), 400
+
     serializer = ContestSchema()
-    contest = Contest() if not pk else Contest.query.get(pk)
+    loaded_data = serializer.load(json_data)
+    if loaded_data.errors:
+        return dict(success=False, message='Validation error', errors=loaded_data.errors), 422
 
-    if contest:
-        form = ContestForm(csrf_enabled=False)
+    contest = loaded_data.data
 
-        if form.validate_on_submit():
-            try:
-                form.populate_obj(contest)
-                db.session.add(contest)
-                db.session.commit()
-            except Exception as e:
-                data.update(message=str(e))
-            else:
-                data.update(
-                    success=True,
-                    contest=serializer.dump(contest).data,
-                    status=200 if pk else 201)
-
+    if pk:
+        contest = Contest.query.get(pk)
+        if not contest:
+            return dict(success=False, message='Contest not found'), 404
         else:
-            data.update(message='Formulário preenchido de forma incorreta.', errors=form.errors, status=412)
+            fetch_object(contest, vars(loaded_data.data))
+
+    try:
+        db.session.add(contest)
+        db.session.commit()
+    except Exception as e:
+        db.sesssion.rollback()
+        return dict(success=False, message=str(e)), 500
     else:
-        data.update(message='Sorteio não encontrado', status=404)
-    return data, data.get('status')
+        return dict(success=True, contest=serializer.dump(contest).data), 200 if pk else 201
 
 
 @app.route('/contests/<uuid:pk>/raffle', methods=['PUT'])
@@ -107,28 +115,30 @@ def get_names(pk=None, contest=None):
 @app.route('/names', methods=['POST'])
 @app.route('/names/<uuid:pk>', methods=['PUT'])
 def add_or_update_name(pk=None):
-    data = {'success': False, 'status': 500}
+
+    json_data = request.get_json()
+    if not json_data:
+        return dict(success=False, message='Request must be json encoded'), 400
+
     serializer = NameSchema()
-    name = Name() if not pk else Name.query.get(pk)
+    loaded_data = serializer.load(json_data)
+    if loaded_data.errors:
+        return dict(success=False, message='Validation error', errors=loaded_data.errors), 422
 
-    if name:
-        form = NameForm(csrf_enabled=False)
+    name = loaded_data.data
 
-        if form.validate_on_submit():
-            try:
-                form.populate_obj(name)
-                db.session.add(name)
-                db.session.commit()
-            except Exception as e:
-                data.update(message=str(e))
-            else:
-                data.update(
-                    success=True,
-                    name=serializer.dump(name).data,
-                    status=200 if pk else 201)
-
+    if pk:
+        name = Name.query.get(pk)
+        if not name:
+            return dict(success=False, message='Name not found'), 404
         else:
-            data.update(message='Formulário preenchido de forma incorreta.', errors=form.errors, status=412)
+            fetch_object(name, vars(loaded_data.data))
+
+    try:
+        db.session.add(name)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return dict(success=False, message=str(e)), 500
     else:
-        data.update(message='Nome não encontrado', status=404)
-    return data, data.get('status')
+        return dict(success=True, name=serializer.dump(name).data), 200 if pk else 201

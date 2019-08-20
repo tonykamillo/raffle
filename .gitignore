@@ -1,5 +1,5 @@
-*.\.sqlite3$
-*.\.py[c|o]$
+*.sqlite3
+*.\.py[c|o]
 \.env
 venv
 *.sublime-workspace
