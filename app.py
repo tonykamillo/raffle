@@ -53,7 +53,8 @@ def create_app(name=__name__, config=None):
 
     # print('loading views')
     with app.app_context():
-        importlib.import_module('views')
+        # importlib.import_module('views')
+        importlib.import_module('api')
 
     # print('initialing database migrations tracking')
     Migrate(app, db, render_as_batch=True)
