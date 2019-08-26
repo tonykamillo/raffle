@@ -27,12 +27,24 @@ def parse_args(args):
     return parsed
 
 
-def register_api(view, endpoint, url, pk='pk', pk_type='int'):
-    view_func = view.as_view(endpoint)
+def register_api(endpoint, api_name=None, pk='pk', pk_type='int'):
 
-    app.add_url_rule(url, defaults={pk: None}, view_func=view_func, methods=['GET'])
-    app.add_url_rule(url, view_func=view_func, methods=['POST'])
-    app.add_url_rule('%s<%s:%s>' % (url, pk_type, pk), view_func=view_func, methods=['GET', 'PUT', 'DELETE'])
+    class Decorator:
+        def __init__(self, view_class):
+            self.view_class = view_class
+
+            api_indentifier = api_name or '%s' % self.view_class.__name__
+
+            view_func = self.view_class.as_view(api_indentifier)
+
+            app.add_url_rule(endpoint, defaults={pk: None}, view_func=view_func, methods=['GET'])
+            app.add_url_rule(endpoint, view_func=view_func, methods=['POST'])
+            app.add_url_rule('%s<%s:%s>' % (endpoint, pk_type, pk), view_func=view_func, methods=['GET', 'PUT', 'DELETE'])
+
+        def __call__(self, *args, **kwargs):
+            return self.view_class(*args, **kwargs)
+
+    return Decorator
 
 
 class CrudOperationsMixin:
@@ -132,6 +144,7 @@ class CrudApi(MethodView, CrudOperationsMixin):
             return dict(success=True, message='The %s %s was deleted' % (self.Model.__name__, instance)), 200
 
 
+@register_api('/contests/', pk_type='uuid')
 class ContestApi(CrudApi):
     Model = Contest
     serializers = {
@@ -140,13 +153,11 @@ class ContestApi(CrudApi):
         'put': ContestWithKeySchema
     }
 
-register_api(ContestApi, 'contest_api', '/contests/', pk_type='uuid')
 
-
+@register_api('/names/', pk_type='uuid')
 class NameApi(CrudApi):
     Model = Name
     Serializer = NameSchema
-register_api(NameApi, 'name_api', '/names/', pk_type='uuid')
 
 
 @app.route('/contests/<uuid:pk>/raffle', endpoint='contest_api_ext', methods=['PUT'])
