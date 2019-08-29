@@ -1,5 +1,6 @@
 import re, datetime
-from flask import current_app as app, request
+
+from flask import current_app as app, request, abort
 from flask.views import MethodView
 from serializers import ContestSchema, ContestWithKeySchema, NameSchema, fetch_object
 from models import Contest, Name
@@ -21,7 +22,6 @@ def parse_args(args):
         for pattern, cast in patterns:
             match = re.match(pattern, v)
             if match:
-                print(match)
                 parsed[k] = cast(v)
                 break
     return parsed
@@ -84,7 +84,7 @@ class CrudOperationsMixin:
             return dict(success=False, message='Validation error', errors=loaded_data.errors), 422
         return loaded_data.data
 
-    def save(self, instance):
+    def save(self, instance, is_update=False):
         try:
             db.session.add(instance)
             db.session.commit()
@@ -92,19 +92,28 @@ class CrudOperationsMixin:
             db.sesssion.rollback()
             return dict(success=False, message=str(e)), 500
         else:
-            return dict(success=True, data=self.serialize(instance).data), 200 if instance.id else 201
+            return dict(success=True, data=self.serialize(instance).data), 200 if is_update else 201
 
 
 class CrudApi(MethodView, CrudOperationsMixin):
     Model = None
     Serializer = None
     serializers = {}
+    authorization = None
+
+    def dispatch_request(self, *args, **kwargs):
+        self.use_serializer(request.method.lower())
+
+        if self.authorization:
+            self.authorization()
+        return super(CrudApi, self).dispatch_request(*args, **kwargs)
 
     def get(self, pk=None):
+        print('GET method')
         found = None
         query = self.get_query()
         if pk:
-            found = query.get(pk)
+            found = self.Model.query.get(pk)
             if not found:
                 return dict(success=False, message='%s not found' % self.Model.__name__), 404
         elif request.args:
@@ -115,14 +124,15 @@ class CrudApi(MethodView, CrudOperationsMixin):
         return dict(success=True, found=self.serialize(found).data)
 
     def post(self):
-        self.use_serializer('post')
+        # self.use_serializer('post')
         data = self.validate_data()
         if isinstance(data, tuple) and not data[0].get('success'):
             return data
         return self.save(data)
 
     def put(self, pk):
-        self.use_serializer('put')
+        print('PUT method')
+        # self.use_serializer('put')
 
         data = self.validate_data()
         if isinstance(data, tuple) and not data[0].get('success'):
@@ -134,7 +144,7 @@ class CrudApi(MethodView, CrudOperationsMixin):
         else:
             fetch_object(instance, vars(data))
 
-        return self.save(instance)
+        return self.save(instance, is_update=True)
 
     def delete(self, pk):
         instance = self.Model.query.get(pk)
@@ -142,6 +152,15 @@ class CrudApi(MethodView, CrudOperationsMixin):
         message = self.save(instance)
         if message[0].get('success'):
             return dict(success=True, message='The %s %s was deleted' % (self.Model.__name__, instance)), 200
+
+
+def process_authorization():
+    if request.method in ['PUT', 'DELETE']:
+        key = request.headers.get('Authorization')
+        query = Contest.query.filter_by(key=key)
+        if query.count() == 0:
+            abort(403)
+        return query.one()
 
 
 @register_api('/contests/', pk_type='uuid')
@@ -153,15 +172,21 @@ class ContestApi(CrudApi):
         'put': ContestWithKeySchema
     }
 
+    authorization = lambda context: process_authorization()
+
 
 @register_api('/names/', pk_type='uuid')
 class NameApi(CrudApi):
     Model = Name
     Serializer = NameSchema
+    authorization = lambda context: process_authorization()
 
 
-@app.route('/contests/<uuid:pk>/raffle', endpoint='contest_api_ext', methods=['PUT'])
+@app.route('/contests/raffle', endpoint='contest_api_ext', methods=['PUT'])
 def raffle(pk):
+
+    contest = process_authorization()
+
     contest = Contest.query.get(pk)
     if contest:
         print(contest)
@@ -175,3 +200,8 @@ def raffle(pk):
             return dict(success=True, winner=NameSchema().dump(winner).data)
     else:
         return dict(success=False, message='Contest not found.'), 404
+
+
+def login():
+    contest = process_authorization()
+    return dict(success=True, found=ContestSchema().dump(contest).data)
