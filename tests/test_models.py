@@ -27,23 +27,18 @@ def create_names(db, contest, names=['Mário', 'Maria', 'Juca', 'Elias', 'João'
 
 
 def test_create_contest(db):
-    # with app.app_context():
     contest = create_contest(db)
-
     assert contest.id is not None
     assert Contest.query.count() >= 1
 
 
 def test_name_slug(db):
     contest_name = 'Sorteio de uma paçoquita'
-    # with app.app_context():
     contest = create_contest(db, contest_name, 'Sorteio de uma caixa de paçoquita')
-
     assert contest.slug == slugify(contest_name, only_ascii=True)
 
 
 def test_key(db):
-    # with app.app_context():
     contest = create_contest(db)
 
     assert isinstance(contest.key, str) is True
@@ -51,19 +46,13 @@ def test_key(db):
 
 
 def test_raffle(db):
-    # with app.app_context():
     contest = create_contest(db)
     names = create_names(db, contest)
 
     winner = contest.raffle()
-
     assert str(winner) in names
-    print(winner)
-
     assert winner.winner is True
-
     assert contest.held_in is not None
-    print(contest.held_in)
 
 
 def test_create_name(db):

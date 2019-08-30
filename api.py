@@ -53,9 +53,8 @@ class CrudOperationsMixin:
         self.Serializer = self.serializers.get(name) or self.serializers.get('default')
 
     def get_serializer(self, **kwargs):
-        if not self.Serializer:
+        if not getattr(self, 'Serializer', None):
             self.use_serializer('default')
-        print('serializer: %s' % self.Serializer)
         return self.Serializer(**kwargs)
 
     def serialize(self, obj):
@@ -102,7 +101,8 @@ class CrudApi(MethodView, CrudOperationsMixin):
     authorization = None
 
     def dispatch_request(self, *args, **kwargs):
-        self.use_serializer(request.method.lower())
+        if not self.Serializer:
+            self.use_serializer(request.method.lower())
 
         if self.authorization:
             self.authorization()
