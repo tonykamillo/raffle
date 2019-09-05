@@ -63,3 +63,27 @@ def test_create_name(client):
     assert name['contest']['id'] == data['contest_id']
     assert name['winner'] is False
     assert name['slug'] == slugify(data['name'], only_ascii=True)
+
+
+def test_update_name(client):
+    contest = create_contest(
+        client, {'name': 'Sorteio de percata'}
+    ).get_json().get('data')
+    data = {'name': 'Tião Kilambi', 'contest_id': contest.get('id')}
+
+    name = create_name(client, data).get_json().get('data')
+
+    data.update({'name': 'Bastião Kilambi'})
+    r = client.put(
+        '/names/%s' % name.get('id'),
+        json=data,
+        headers={'Authorization': contest.get('key')}
+    )
+
+    json_data = is_json_response(r)
+    updated_name = json_data.get('data')
+
+    assert r.status_code == 200
+    assert name['id'] == updated_name['id']
+    assert updated_name['name'] == data['name']
+    assert updated_name['slug'] == slugify(data['name'], only_ascii=True)

@@ -124,7 +124,7 @@ class CrudApi(MethodView, CrudOperationsMixin):
         return dict(success=True, found=self.serialize(found).data)
 
     def post(self):
-        # self.use_serializer('post')
+
         data = self.validate_data()
         if isinstance(data, tuple) and not data[0].get('success'):
             return data
@@ -132,7 +132,6 @@ class CrudApi(MethodView, CrudOperationsMixin):
 
     def put(self, pk):
         print('PUT method')
-        # self.use_serializer('put')
 
         data = self.validate_data()
         if isinstance(data, tuple) and not data[0].get('success'):
@@ -183,13 +182,11 @@ class NameApi(CrudApi):
 
 
 @app.route('/contests/raffle', endpoint='contest_api_ext', methods=['PUT'])
-def raffle(pk):
+def raffle():
 
     contest = process_authorization()
 
-    contest = Contest.query.get(pk)
     if contest:
-        print(contest)
         try:
             winner = contest.raffle()
             db.session.commit()
