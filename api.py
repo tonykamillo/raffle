@@ -1,7 +1,9 @@
 import re, datetime
+from functools import wraps
 
-from flask import current_app as app, request, abort
+from flask import current_app as app, request, abort, Response
 from flask.views import MethodView
+from marshmallow import ValidationError
 from serializers import ContestSchema, ContestWithKeySchema, NameSchema, fetch_object
 from models import Contest, Name
 from app import db
@@ -47,6 +49,13 @@ def register_api(endpoint, api_name=None, pk='pk', pk_type='int'):
     return Decorator
 
 
+@app.after_request
+def after_request(response):
+    header = response.headers
+    header['Access-Control-Allow-Origin'] = '*'
+    return response
+
+
 class CrudOperationsMixin:
 
     def use_serializer(self, name='default'):
@@ -78,10 +87,13 @@ class CrudOperationsMixin:
             return data
 
         serializer = self.get_serializer()
-        loaded_data = serializer.load(data)
-        if loaded_data.errors:
-            return dict(success=False, message='Validation error', errors=loaded_data.errors), 422
-        return loaded_data.data
+        try:
+            loaded_data = serializer.load(data)
+            print('loaded data: %s' % loaded_data)
+        except ValidationError as err:
+            return dict(success=False, message='Validation error', errors=err.messages), 422
+        else:
+            return loaded_data
 
     def save(self, instance, is_update=False):
         try:
@@ -91,7 +103,7 @@ class CrudOperationsMixin:
             db.sesssion.rollback()
             return dict(success=False, message=str(e)), 500
         else:
-            return dict(success=True, data=self.serialize(instance).data), 200 if is_update else 201
+            return dict(success=True, data=self.serialize(instance)), 200 if is_update else 201
 
 
 class CrudApi(MethodView, CrudOperationsMixin):
@@ -99,6 +111,9 @@ class CrudApi(MethodView, CrudOperationsMixin):
     Serializer = None
     serializers = {}
     authorization = None
+    headers = {
+        'Access-Control-Allow-Origin': '*'
+    }
 
     def dispatch_request(self, *args, **kwargs):
         if not self.Serializer:
@@ -108,8 +123,9 @@ class CrudApi(MethodView, CrudOperationsMixin):
             self.authorization()
         return super(CrudApi, self).dispatch_request(*args, **kwargs)
 
+    # @cors()
     def get(self, pk=None):
-        print('GET method')
+
         found = None
         query = self.get_query()
         if pk:
@@ -121,7 +137,7 @@ class CrudApi(MethodView, CrudOperationsMixin):
             found = query.filter_by(**params).all()
         else:
             found = query.all()
-        return dict(success=True, found=self.serialize(found).data)
+        return dict(success=True, found=self.serialize(found))
 
     def post(self):
 

@@ -20,7 +20,7 @@ class ContestSchema(ma.ModelSchema):
 
     def get_names(self, instance):
         names = instance.names.filter_by(deleted=False).all()
-        return NameSchema(many=True, exclude=['contest']).dump(names).data
+        return NameSchema(many=True, exclude=['contest']).dump(names)
 
 
 class ContestWithKeySchema(ContestSchema):
