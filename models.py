@@ -20,7 +20,8 @@ class Base(JoinedInheritanceMixin, db.Model):
 
 
 class Contest(Base):
-    key = db.Column(db.UUID, default=uuid.uuid4, index=True)
+    public_key = db.Column(db.UUID, default=uuid.uuid4, index=True)
+    private_key = db.Column(db.UUID, default=uuid.uuid4, index=True)
     held_in = db.Column(db.DateTime, index=True)
     description = db.Column(db.Text)
 
@@ -37,7 +38,7 @@ class Contest(Base):
             return self.names.filter_by(deleted=False, winner=True).one()
 
     def __str__(self):
-        return '%s - [%s]' % (self.name, self.key)
+        return '%s - [%s]:[%s]' % (self.name, self.private_key, self.public_key)
 
 
 class Name(Base):

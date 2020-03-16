@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import NavBar from '../components/navbar.js';
 import Cards from '../components/cards.js';
 
@@ -9,19 +10,25 @@ export default (props) => {
     const [contests, setContests] = useState([]);
 
     useEffect(() => {
-        fetch(API + 'contests/')
-            .then(res => {
-                return res.json()
-            })
-            .then(json => {
-                if (json.success)
-                    setContests(json.found)
-                else
-                    throw json.message
-
-            })
-            .catch(err => console.log(err))
+        fetchContests()
     }, [])
+
+    const fetchContests = (params) => {
+        axios.get(API + 'contests/', {
+            params
+        })
+        .then(res => {
+            return res.json()
+        })
+        .then(json => {
+            if (json.success)
+                setContests(json.found)
+            else
+                throw json.message
+
+        })
+        .catch(err => console.log(err))
+    }
 
     return (
         <div className="container">

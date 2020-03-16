@@ -14,7 +14,7 @@ class ContestSchema(ma.ModelSchema):
     class Meta:
         model = Contest
         dump_only = ['id', 'slug']
-        exclude = ['deleted', 'key']
+        exclude = ['deleted', 'public_key', 'private_key']
 
     names = fields.Method('get_names', dump_only=True)
 
@@ -23,9 +23,9 @@ class ContestSchema(ma.ModelSchema):
         return NameSchema(many=True, exclude=['contest']).dump(names)
 
 
-class ContestWithKeySchema(ContestSchema):
+class ContestWithPrivateKeySchema(ContestSchema):
     class Meta(ContestSchema.Meta):
-        exclude = ['deleted']
+        exclude = ['deleted', 'public_key']
 
 
 class NameSchema(ma.ModelSchema):

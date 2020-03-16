@@ -1,10 +1,10 @@
 import re, datetime
 from functools import wraps
 
-from flask import current_app as app, request, abort, Response
+from flask import current_app as app, request, abort, Response, url_for
 from flask.views import MethodView
 from marshmallow import ValidationError
-from serializers import ContestSchema, ContestWithKeySchema, NameSchema, fetch_object
+from serializers import ContestSchema, ContestWithPrivateKeySchema, NameSchema, fetch_object
 from models import Contest, Name
 from app import db
 
@@ -110,6 +110,7 @@ class CrudApi(MethodView, CrudOperationsMixin):
     Model = None
     Serializer = None
     serializers = {}
+    authorized = False
 
     def authorization(self, *args, **kwargs):
         return False
@@ -121,7 +122,7 @@ class CrudApi(MethodView, CrudOperationsMixin):
         if not self.Serializer:
             self.use_serializer(request.method.lower())
 
-        self.authorized = self.authorization(*args, **kwargs)
+        self.authorized = bool(self.authorization(*args, **kwargs))
 
         return super(CrudApi, self).dispatch_request(*args, **kwargs)
 
@@ -139,7 +140,7 @@ class CrudApi(MethodView, CrudOperationsMixin):
             found = query.filter_by(**params).all()
         else:
             found = query.all()
-        return dict(success=True, found=self.serialize(found))
+        return dict(success=True, authorized=self.authorized, found=self.serialize(found))
 
     def post(self):
 
@@ -174,19 +175,33 @@ class CrudApi(MethodView, CrudOperationsMixin):
 def process_contest_authorization(*args, **kwargs):
     if request.method in ['PUT', 'DELETE']:
         key = request.headers.get('Authorization')
-        query = Contest.query.filter_by(key=key)
-        if query.count() == 0 or query.one().id != kwargs.get('pk') :
+        query = Contest.query.filter_by(private_key=key)
+        if query.count() == 0 or query.one().id != kwargs.get('pk'):
             abort(403)
         return query.one()
 
+    if request.method in ['GET']:
+        pubkey = request.args.get('key')
+        privkey = request.headers.get('Authorization')
+
+        params = {}
+        if pubkey:
+            params['public_key'] = pubkey
+        elif privkey:
+            params['private_key'] = privkey
+
+        query = Contest.query.filter_by(**params)
+        if query.count() == 1 and query.one().id != kwargs.get('pk'):
+            return query.one()
+    return False
 
 @register_api('/contests/', pk_type='uuid')
 class ContestApi(CrudApi):
     Model = Contest
     serializers = {
         'default': ContestSchema,
-        'post': ContestWithKeySchema,
-        'put': ContestWithKeySchema
+        'post': ContestWithPrivateKeySchema,
+        'put': ContestWithPrivateKeySchema
     }
 
     def authorization(self, *args, **kwargs):
@@ -201,12 +216,29 @@ class NameApi(CrudApi):
     def authorization(self, *args, **kwargs):
         if request.method in ['PUT', 'DELETE']:
             key = request.headers.get('Authorization')
-            query = Contest.query.filter_by(key=key)
+            query = Contest.query.filter_by(private_key=key)
             name = Name.query.get(kwargs.get('pk'))
             if query.count() == 0 or query.one().id != name.contest.id:
                 abort(403)
             return query.one()
 
+        elif request.method in ['POST']:
+            key = request.headers.get('Authorization')
+            query = Contest.query.filter_by(public_key=key)
+            if query.count() == 0:
+                abort(403)
+            return query.one()
+
+
+@app.route('/contests/<uuid:pk>/join-link', endpoint='JoinApi', methods=['GET'])
+def join(pk=None):
+
+    contest = process_contest_authorization(pk=pk)
+
+    if contest:
+        return dict(success=True, link=url_for('ContestApi', pk=contest.id, key=contest.public_key))
+    else:
+        return dict(success=False, message='Contest not found.'), 404
 
 @app.route('/contests/<uuid:pk>/raffle', endpoint='RaffleApi', methods=['PUT'])
 def raffle(pk=None):
@@ -224,8 +256,3 @@ def raffle(pk=None):
             return dict(success=True, winner=NameSchema().dump(winner).data)
     else:
         return dict(success=False, message='Contest not found.'), 404
-
-
-def login():
-    contest = process_authorization()
-    return dict(success=True, found=ContestSchema().dump(contest).data)

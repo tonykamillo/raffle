@@ -90,11 +90,3 @@ class SQLAlchemyDRY(_SQLAlchemy):
 
         self.m2m = lambda t1, t2: m2m(db, t1, t2)
         self.UUID = UUID
-
-
-# def SQLAlchemy(*args, **kwargs):
-#     kwargs.update(model_class=ModelUUID, query_class=Query)
-#     db = _SQLAlchemy(*args, **kwargs)
-#     db.m2m = lambda t1, t2: m2m(db, t1, t2)
-#     db.UUID = UUID
-#     return db
