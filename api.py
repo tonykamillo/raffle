@@ -110,17 +110,19 @@ class CrudApi(MethodView, CrudOperationsMixin):
     Model = None
     Serializer = None
     serializers = {}
-    authorization = None
-    headers = {
-        'Access-Control-Allow-Origin': '*'
-    }
+
+    def authorization(self, *args, **kwargs):
+        return False
 
     def dispatch_request(self, *args, **kwargs):
+
+        app.logger.info(kwargs)
+
         if not self.Serializer:
             self.use_serializer(request.method.lower())
 
-        if self.authorization:
-            self.authorization()
+        self.authorized = self.authorization(*args, **kwargs)
+
         return super(CrudApi, self).dispatch_request(*args, **kwargs)
 
     # @cors()
@@ -169,11 +171,11 @@ class CrudApi(MethodView, CrudOperationsMixin):
             return dict(success=True, message='The %s %s was deleted' % (self.Model.__name__, instance)), 200
 
 
-def process_authorization():
+def process_contest_authorization(*args, **kwargs):
     if request.method in ['PUT', 'DELETE']:
         key = request.headers.get('Authorization')
         query = Contest.query.filter_by(key=key)
-        if query.count() == 0:
+        if query.count() == 0 or query.one().id != kwargs.get('pk') :
             abort(403)
         return query.one()
 
@@ -187,20 +189,29 @@ class ContestApi(CrudApi):
         'put': ContestWithKeySchema
     }
 
-    authorization = lambda context: process_authorization()
+    def authorization(self, *args, **kwargs):
+        return process_contest_authorization(*args, **kwargs)
 
 
 @register_api('/names/', pk_type='uuid')
 class NameApi(CrudApi):
     Model = Name
     Serializer = NameSchema
-    authorization = lambda context: process_authorization()
+
+    def authorization(self, *args, **kwargs):
+        if request.method in ['PUT', 'DELETE']:
+            key = request.headers.get('Authorization')
+            query = Contest.query.filter_by(key=key)
+            name = Name.query.get(kwargs.get('pk'))
+            if query.count() == 0 or query.one().id != name.contest.id:
+                abort(403)
+            return query.one()
 
 
-@app.route('/contests/raffle', endpoint='contest_api_ext', methods=['PUT'])
-def raffle():
+@app.route('/contests/<uuid:pk>/raffle', endpoint='RaffleApi', methods=['PUT'])
+def raffle(pk=None):
 
-    contest = process_authorization()
+    contest = process_contest_authorization(pk=pk)
 
     if contest:
         try:

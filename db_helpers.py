@@ -81,9 +81,20 @@ class Query(BaseQuery):
         return self.filter_by(deleted=False)
 
 
-def SQLAlchemy(*args, **kwargs):
-    kwargs.update(model_class=ModelUUID, query_class=Query)
-    db = _SQLAlchemy(*args, **kwargs)
-    db.m2m = lambda t1, t2: m2m(db, t1, t2)
-    db.UUID = UUID
-    return db
+class SQLAlchemyDRY(_SQLAlchemy):
+
+    def __init__(self, *args, **kwargs):
+        kwargs.update(model_class=ModelUUID, query_class=Query)
+
+        super(SQLAlchemyDRY, self).__init__(*args, **kwargs)
+
+        self.m2m = lambda t1, t2: m2m(db, t1, t2)
+        self.UUID = UUID
+
+
+# def SQLAlchemy(*args, **kwargs):
+#     kwargs.update(model_class=ModelUUID, query_class=Query)
+#     db = _SQLAlchemy(*args, **kwargs)
+#     db.m2m = lambda t1, t2: m2m(db, t1, t2)
+#     db.UUID = UUID
+#     return db

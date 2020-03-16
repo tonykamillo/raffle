@@ -3,10 +3,10 @@ from flask import Flask
 from flask_migrate import Migrate
 from flask_marshmallow import Marshmallow
 from flask_wtf.csrf import CSRFProtect
-from db_helpers import SQLAlchemy
+from db_helpers import SQLAlchemyDRY
 
 
-db = SQLAlchemy()
+db = SQLAlchemyDRY()
 ma = Marshmallow()
 csrf = CSRFProtect()
 
