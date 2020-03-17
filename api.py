@@ -3,6 +3,7 @@ from functools import wraps
 
 from flask import current_app as app, request, abort, Response, url_for
 from flask.views import MethodView
+from sqlalchemy import or_
 from marshmallow import ValidationError
 from serializers import ContestSchema, ContestWithPrivateKeySchema, NameSchema, fetch_object
 from models import Contest, Name
@@ -137,6 +138,14 @@ class CrudApi(MethodView, CrudOperationsMixin):
                 return dict(success=False, message='%s not found' % self.Model.__name__), 404
         elif request.args:
             params = parse_args(dict(request.args))
+
+            if 'search' in params:
+                search = params.pop('search')
+                query = query.filter(or_(
+                    self.Model.name.like('%%%s%%' % search),
+                    self.Model.description.like('%%%s%%' % search)
+                ))
+
             found = query.filter_by(**params).all()
         else:
             found = query.all()
@@ -150,7 +159,6 @@ class CrudApi(MethodView, CrudOperationsMixin):
         return self.save(data)
 
     def put(self, pk):
-        print('PUT method')
 
         data = self.validate_data()
         if isinstance(data, tuple) and not data[0].get('success'):

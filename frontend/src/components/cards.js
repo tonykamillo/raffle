@@ -12,9 +12,9 @@ export default ({cards}) => {
 
     return (
         <div className="cards row">
-        { items.map(item =>
-            <div className="col-xs-12 col-sm-12 col-lg-4 mb-4">
-                <Card key={item.id} title={item.name} fields={[
+        { items.map((item, index) =>
+            <div key={index} className="col-xs-12 col-sm-12 col-lg-4 mb-4">
+                <Card title={item.name} fields={[
                     {label: 'Descrição', value: item.description},
                     {label: 'Sorteado em:', value: item.held_in}
                 ]} buttons={[]}/>
